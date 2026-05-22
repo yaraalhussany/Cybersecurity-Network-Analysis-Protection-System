@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Network Dashboard</title>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7ff, #eef2ff);
+            color: #1f2937;
+            transition: background 0.5s ease; 
+        }
+
+        h1 {
+            text-align: center;
+            padding: 30px 10px 10px;
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+        }
+
+        .top-actions {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .refresh-btn {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(79,70,229,0.2);
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 18px;
+        }
+
+        .output-card {
+            background: white;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+            transition: all 0.25s ease;
+            border: 1px solid rgba(0,0,0,0.04);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .output-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #6366f1, #22c55e);
+        }
+
+        .output-card.attack-mode::before {
+            background: linear-gradient(90deg, #ef4444, #b91c1c);
+        }
+
+        .output-card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+        }
+
+        .output-card h3 {
+            margin: 0 0 8px;
+            font-size: 16px;
+            color: #374151;
+            font-weight: 600;
+        }
+
+        .output-card p {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            word-break: break-word;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Virtual Network Dashboard</h1>
+
+    <div class="top-actions">
+        <button class="refresh-btn" onclick="updateDashboard()">
+            Force Refresh
+        </button>
+    </div>
+
+    <div class="container" id="container"></div>
+
+    <script>
+        function renderOutputs(dataObj) {
+            const container = document.getElementById("container");
+
+            const labels = [
+                "Bwd Packet Length Max", "Bwd Packet Length Mean", "Bwd Packet Length Std",
+                "Flow IAT Max", "Fwd IAT Std", "Fwd IAT Max", "Max Packet Length",
+                "Packet Length Mean", "Packet Length Std", "Packet Length Variance",
+                "Avg Packet Size", "Avg Bwd Segment Size", "Idle Mean",
+                "Idle Max", "Idle Min", "Attack Status"
+            ];
+
+            // 1. Check attack status and change background color (BUG FIXED HERE)
+            const attackStatus = String(dataObj["Attack Status"]).trim().toUpperCase();
+            
+            const isUnderAttack = attackStatus.includes("HACKER") || 
+                                  attackStatus.includes("SUSPICIOUS") || 
+                                  attackStatus === "ATTACK" || 
+                                  attackStatus === "1";
+
+            if (isUnderAttack) {
+                document.body.style.background = "linear-gradient(135deg, #ffecec, #ffc2c2)";
+            } else {
+                document.body.style.background = "linear-gradient(135deg, #f5f7ff, #eef2ff)";
+            }
+
+            // 2. Render the cards dynamically from the JSON object
+            container.innerHTML = labels.map(label => {
+                const val = dataObj[label] !== undefined ? dataObj[label] : "N/A";
+                const cardClass = isUnderAttack ? "output-card attack-mode" : "output-card";
+                
+                return `
+                    <div class="${cardClass}">
+                        <h3>${label}</h3>
+                        <p>${val}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateDashboard() {
+            fetch('/refresh')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json(); 
+                })
+                .then(data => {
+                    if (data.error) {
+                        console.error("Backend error:", data.error);
+                        return;
+                    }
+                    renderOutputs(data);
+                })
+                .catch(err => console.error("Error loading data:", err));
+        }
+
+        // Run immediately when the page loads
+        updateDashboard();
+        
+        // Poll the backend every 60 seconds (60000 ms)
+        setInterval(updateDashboard, 60000);
+    </script>
+
+</body>
+</html>
